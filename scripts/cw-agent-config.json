@@ -1,0 +1,28 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "metrics": {
+    "namespace": "HostResources",
+    "append_dimensions": {
+      "InstanceId": "${aws:InstanceId}"
+    },
+    "metrics_collected": {
+      "procstat": [
+        {
+          "pattern": "nginx",
+          "measurement": [
+            { "name": "memory_rss", "rename": "MemoryUsage", "unit": "Bytes" }
+          ]
+        },
+        {
+          "pattern": "amazon-ssm-agent",
+          "measurement": [
+            { "name": "memory_rss", "rename": "MemoryUsage", "unit": "Bytes" }
+          ]
+        }
+      ]
+    }
+  }
+}

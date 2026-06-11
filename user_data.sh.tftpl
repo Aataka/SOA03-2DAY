@@ -1,0 +1,57 @@
+#!/bin/bash
+# AL2023 起動時セットアップ。
+# 方針: コア(UserLogins投稿)を最優先で確実に立ち上げ、
+#       メモリ計測(CWエージェント)は失敗してもコアを止めないよう後追い・非致命にする。
+set -uxo pipefail
+exec > /var/log/user-data.log 2>&1
+
+# --- コア: Python + boto3 ---
+dnf install -y python3-pip
+# PEP668(externally-managed)で弾かれる環境にもフォールバック
+pip3 install --quiet boto3 || pip3 install --quiet --break-system-packages boto3
+
+mkdir -p /opt/poster /var/lib
+echo "${seed_script_b64}"   | base64 -d > /opt/poster/seed_and_post.py
+echo "${inject_script_b64}" | base64 -d > /opt/poster/inject_anomaly.py
+chmod +x /opt/poster/*.py
+
+# --- コア: 定常投稿サービス（起動時に backfill → 60秒ごと投稿） ---
+cat > /etc/systemd/system/login-poster.service <<UNIT
+[Unit]
+Description=TravelApplication UserLogins poster
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=AWS_DEFAULT_REGION=${region}
+Environment=CW_NAMESPACE=${namespace}
+Environment=CW_METRIC=${metric_name}
+Environment=BACKFILL_DAYS=${backfill_days}
+ExecStart=/usr/bin/python3 /opt/poster/seed_and_post.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now login-poster.service
+
+# --- 任意: メモリ計測（ラボTask3の運用版。失敗してもコアは継続） ---
+%{ if enable_memory_metrics ~}
+{
+  dnf install -y nginx amazon-cloudwatch-agent
+  systemctl enable --now nginx
+  echo "${agent_config_b64}" | base64 -d > /opt/poster/cw-agent-config.json
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+    -a fetch-config -m ec2 -s -c file:/opt/poster/cw-agent-config.json
+} || echo "WARN: memory metrics setup failed (non-fatal)"
+%{ endif ~}
+
+# --- 自動停止セーフティネット（destroy忘れ対策。terminateではなくstop） ---
+%{ if auto_stop_minutes > 0 ~}
+shutdown -h +${auto_stop_minutes} "auto-stop safety net after ${auto_stop_minutes} min"
+%{ endif ~}
+
+echo "user-data complete"
