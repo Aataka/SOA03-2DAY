@@ -12,15 +12,11 @@
       "procstat": [
         {
           "pattern": "nginx",
-          "measurement": [
-            { "name": "memory_rss", "rename": "MemoryUsage", "unit": "Bytes" }
-          ]
+          "measurement": ["memory_rss"]
         },
         {
           "pattern": "amazon-ssm-agent",
-          "measurement": [
-            { "name": "memory_rss", "rename": "MemoryUsage", "unit": "Bytes" }
-          ]
+          "measurement": ["memory_rss"]
         }
       ]
     }

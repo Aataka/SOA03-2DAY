@@ -168,8 +168,10 @@ aws cloudwatch describe-anomaly-detectors --region <REGION> \
   CloudWatch は過去14日(2週間)まで `put-metric-data` のタイムスタンプを受理する（それ以前は拒否）。
   境界ちょうどだと最古バッチが丸ごと弾かれることがあるため、本構成は安全側で `backfill_days=13`。
 - **検出器はアラーム削除では消えないことがある** → `delete-anomaly-detector` で明示削除。
-- **CWエージェントの procstat ディメンション**はラボの `ProcessName` と異なり `pattern` 等になる
-  （運用版に置換しているため）。
+- **CWエージェントの procstat 設定**は `measurement` を**文字列配列**で書く（`["memory_rss"]`）。
+  `{name,rename,unit}` のオブジェクト形式はスキーマエラー（`Invalid type. Expected: string, given: object`）で
+  agent起動に失敗する。メトリクスは `HostResources/procstat_memory_rss`、ディメンションはラボの
+  `ProcessName` と異なり `pattern`/`InstanceId` になる（運用版に置換しているため）。
 - SNSメール購読が確認直後に解除される場合は
   `aws sns confirm-subscription --authenticate-on-unsubscribe true`（リンク直クリックを避ける）。
 
